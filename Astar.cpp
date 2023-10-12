@@ -1,6 +1,13 @@
+#include <SFML/System/Vector2.hpp>
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <SFML/Graphics.hpp>
 #include <eigen3/Eigen/Dense>
+#include <limits>
+#include <unordered_map>
+#include <variant>
+#include <vector>
 
 using namespace std;
 
@@ -53,9 +60,25 @@ void createGrid() {
 	}
 }
 
+std::unordered_map<Node*, int> initCost(Node* startNode) {
+    std::unordered_map<Node*, int> costs;
+    costs[startNode] = 0;
+    for(Node& node : nodes) {
+        if(!(node == *startNode)) {
+            costs[&node] = std::numeric_limits<int>::max();
+        }
+    }
+    return costs;
+}
+
 // return node from cooordinates
 Node* getNode(int x, int y) {
     return &nodes[y + x*HEIGHT];
+}
+
+// override of the getNode if we get Vector2i as parameter
+Node* getNode(sf::Vector2i coord) {
+    return &nodes[coord.y + coord.x*HEIGHT];
 }
 
 // the node is not actually removed from the graph but it gets isolated from its neighbors
@@ -100,10 +123,107 @@ vector<Node*> getObstacles() {
 }
 
 
+// Define the heuristic of the current node (just Euclidian distance in our case
+int heuristic(Node current_node, Node target_node) {
+    return sqrt(pow((current_node.x-target_node.x), 2) + pow((current_node.y-target_node.y), 2));
+}
+
+
+// Return total cost of path through node n ( f(n)=g(n)+h(n)
+int f(Node n, Node former, Node target) {
+    auto edge_to_n = std::find_if(former.edges.begin(),
+                              former.edges.end(),
+                              [&n](Edge& edge) { return *edge.nodes.second == n; }); 
+    int g = edge_to_n->cost;
+    int h = heuristic(n, target);
+    return g + h;
+}
+
+
+// this gets the candidate to visit in the open list (lowest f(n)=g(n)+h(n)
+Node* getCurrent(vector<Node*> open, Node former, Node target) {
+    auto current = std::min_element(*open.begin(), 
+                            *open.end(), 
+                            [former, target](const Node candidate1, const Node candidate2) { 
+                                return f(candidate1, former, target) < f(candidate2, former, target);
+                            });
+    return current;
+}
+
+
+// add neighbors to current node to open list
+std::unordered_map<Edge*, Node*> getNeighbors(Node* node) {
+    std::unordered_map<Edge*, Node*> neighbors;
+    std::for_each(node->edges.begin(), 
+                  node->edges.end(),
+                  [&neighbors](Edge* edge) { neighbors[edge] = edge->nodes.second; });
+    return neighbors;
+}
+
+
+// return nodes of path
+vector<Node*> retrievePath(Node* start, Node* end, std::unordered_map<Node*, Node*> parentDict) {
+    vector<Node*> path;
+    // we start from the end and add it to the path
+    Node* current = end;
+    path.push_back(current);
+    while(!(*current == *start)) {
+        // retrace until the starting node using the parent of the current node
+        current = parentDict[current];
+        path.push_back(current);
+    }
+    return path;
+}
+
+
+// The A* algorithm
+vector<Node*> Astar(sf::Vector2i startNode, sf::Vector2i endNode) {
+    vector<Node*> path;
+    // initialize open and close list (open are candidates, close are already visited), a parent dictionary, and an initial cost
+    vector<Node*> open;
+    vector<Node*> closed;
+    std::unordered_map<Node*, Node*> parentDict;
+    std::unordered_map<Node*, int> costs = initCost(getNode(startNode));
+    // set start node as current to explore and get its neighbors
+    Node* current = getNode(startNode);
+    open.push_back(current);
+    // until open is empty 
+    while(open.size() != 0) {
+        // current to visit is lowest f(n) among open list
+        current = getCurrent(open, *getNode(startNode), *getNode(endNode));
+        if (current == getNode(endNode)) {
+            // END ALGORITHM AND RETRACE PATH
+            return retrievePath(getNode(startNode), getNode(endNode), parentDict);
+        }
+        // get the neighborings nodes and edges of current
+        std::unordered_map<Edge*, Node*> neighbors = getNeighbors(current);
+        // current has been visited so we put it out of open and place it in closed
+        closed.push_back(current);
+        open.erase(std::remove(open.begin(), open.end(), current));
+        for (const auto& neighbor : neighbors) {
+            // check if neighbor node (the second member in the neighbor pair is node) is in the open and closed list
+            bool is_in_open = (std::find(open.begin(), open.end(), neighbor.second) != open.end());
+            bool is_in_closed = (std::find(closed.begin(), closed.end(), neighbor.second) != closed.end());
+            // compute tentative g_value of neighbor (current cost + edge cost)
+            int g_value = costs[current] + neighbor.first->cost;
+            // The neighbor has to be skipped if in closed (already explored) and g_value doesn't need update
+            if(is_in_closed && g_value >= costs[neighbor.second]) break;
+            // update parent and cost of neighbor if never visited or better g_value than its cost
+            if(!(is_in_open) || g_value <= costs[neighbor.second]) {
+                parentDict[neighbor.second] = current;
+                costs[neighbor.second] = g_value;
+                // add neighbor in explorable nodes if it wasn't
+                if(!is_in_open) open.push_back(neighbor.second);
+            }
+        }
+    }
+    cout << "There is nothing we can do..." << endl;
+    return path;
+}
+
 
 
 int main() {
-
     createGrid();
     sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "A*");
 
@@ -113,5 +233,4 @@ int main() {
         window.display();
 
     }
-
 }
