@@ -42,8 +42,8 @@ void createGrid() {
 	for (int i = 0 ; i < HEIGHT ; i++) {
 		for (int j = 0 ; j < WIDTH ; j++) {
             // set node coordinates
-            nodes[j + i*HEIGHT].x = j;
-            nodes[j + i*HEIGHT].y = i;
+            nodes[j + i*WIDTH].x = j;
+            nodes[j + i*WIDTH].y = i;
 			//exploring neighborhood
 			for (int m = -1 ; m <= 1 ; m++) {
 				for (int n = -1 ; n <= 1 ; n++) {
@@ -52,14 +52,8 @@ void createGrid() {
 						//check whether neighbor is diagonal or not
 						float c = (m == 0 || n == 0) ? 1 : std::sqrt(2);
                         // create the edge and add it
-                        Edge e = Edge(&nodes[j + i*HEIGHT], &nodes[j+n + (i+m)*HEIGHT], c);
-                        nodes[j + i*HEIGHT].edges.push_back(e);
-                        if (i == 1 && j == 1) {
-                            cout << "check 9x9" << endl;
-                            for(Edge edge : nodes[j + i*HEIGHT].edges) {
-                                cout << edge.nodes.second->x << " " << edge.nodes.second->y << endl;
-                            }
-                        }
+                        Edge e = Edge(&nodes[j + i*WIDTH], &nodes[j+n + (i+m)*WIDTH], c);
+                        nodes[j + i*WIDTH].edges.push_back(e);
 					}
 				}
 			}
@@ -67,12 +61,12 @@ void createGrid() {
 	}
 }
 
-std::unordered_map<Node*, int> initCost(Node* startNode) {
-    std::unordered_map<Node*, int> costs;
+std::unordered_map<Node*, float> initCost(Node* startNode) {
+    std::unordered_map<Node*, float> costs;
     costs[startNode] = 0;
     for(Node& node : nodes) {
         if(!(node == *startNode)) {
-            costs[&node] = std::numeric_limits<int>::max();
+            costs[&node] = std::numeric_limits<float>::max();
         }
     }
     return costs;
@@ -80,12 +74,12 @@ std::unordered_map<Node*, int> initCost(Node* startNode) {
 
 // return node from cooordinates
 Node* getNode(int x, int y) {
-    return &nodes[y + x*HEIGHT];
+    return &nodes[x + y*WIDTH];
 }
 
 // override of the getNode if we get Vector2i as parameter
 Node* getNode(sf::Vector2i coord) {
-    return &nodes[coord.y + coord.x*HEIGHT];
+    return &nodes[coord.x + coord.y*WIDTH];
 }
 
 // the node is not actually removed from the graph but it gets isolated from its neighbors
@@ -110,7 +104,7 @@ int getSize() {
     int size = 0;
     for (int i=0; i < HEIGHT ; i++) {
         for (int j=0; j < WIDTH ; j++) {
-            if (nodes[j + i*HEIGHT].edges.size() != 0) size++;
+            if (nodes[j + i*WIDTH].edges.size() != 0) size++;
         }
     }
     return size;
@@ -121,8 +115,8 @@ vector<Node*> getObstacles() {
     vector<Node*> obstacles;
     for (int i=0; i < HEIGHT ; i++) {
         for (int j=0; j < WIDTH ; j++) {
-            if (nodes[j + i*HEIGHT].edges.size() == 0) {
-                obstacles.push_back(&nodes[j + i*HEIGHT]);
+            if (nodes[j + i*WIDTH].edges.size() == 0) {
+                obstacles.push_back(&nodes[j + i*WIDTH]);
             }
         }
     }
@@ -131,18 +125,18 @@ vector<Node*> getObstacles() {
 
 
 // Define the heuristic of the current node (just Euclidian distance in our case
-int heuristic(Node current_node, Node target_node) {
-    return sqrt(pow((current_node.x-target_node.x), 2) + pow((current_node.y-target_node.y), 2));
+float heuristic(Node current_node, Node target_node) {
+    return sqrt(pow(((float)current_node.x-(float)target_node.x), 2) + pow(((float)current_node.y-(float)target_node.y), 2));
 }
 
 
 // Return total cost of path through node n ( f(n)=g(n)+h(n)
-int f(Node* n, Node former, Node target) {
+float f(Node* n, Node former, Node target) {
     auto edge_to_n = std::find_if(former.edges.begin(),
                               former.edges.end(),
                               [&n](Edge& edge) { return *edge.nodes.second == *n; }); 
-    int g = edge_to_n->cost;
-    int h = heuristic(*n, target);
+    float g = edge_to_n->cost;
+    float h = heuristic(*n, target);
     return g + h;
 }
 
@@ -160,22 +154,10 @@ Node* getCurrent(vector<Node*> open, Node former, Node target) {
 
 // add neighbors to current node to open list
 std::unordered_map<Edge*, Node*> getNeighbors(Node* node) {
-    /*
-    cout << "pure check" << endl;
-    for(Edge edge : node->edges) {
-        cout << edge.nodes.second->x << " " << edge.nodes.second->y << endl;
-    }
-    */
     std::unordered_map<Edge*, Node*> neighbors;
     std::for_each(node->edges.begin(), 
                   node->edges.end(),
                   [&neighbors](Edge& edge) { neighbors[&edge] = edge.nodes.second; });
-    /*
-    cout << "check in neighbours" << endl;
-    for(std::pair<Edge*, Node*> nei : neighbors) {
-        cout << nei.second->x << " " << nei.second->y << endl;
-    }
-    */
     return neighbors;
 }
 
@@ -198,12 +180,11 @@ vector<Node*> retrievePath(Node* start, Node* end, std::unordered_map<Node*, Nod
 // The A* algorithm
 vector<Node*> Astar(sf::Vector2i startNode, sf::Vector2i endNode) {
     vector<Node*> path;
-    return path;
     // initialize open and close list (open are candidates, close are already visited), a parent dictionary, and an initial cost
     vector<Node*> open;
     vector<Node*> closed;
     std::unordered_map<Node*, Node*> parentDict;
-    std::unordered_map<Node*, int> costs = initCost(getNode(startNode));
+    std::unordered_map<Node*, float> costs = initCost(getNode(startNode));
     // set start node as current to explore and get its neighbors
     cout << "start" << endl;
     Node* current = getNode(startNode);
@@ -229,12 +210,13 @@ vector<Node*> Astar(sf::Vector2i startNode, sf::Vector2i endNode) {
         open.erase(std::remove(open.begin(), open.end(), current));
         for (const auto& neighbor : neighbors) {
             cout << "neighbor is : " << neighbor.second->x << " " << neighbor.second->y << endl;
+            cout << "cost : " << neighbor.first->cost << endl;
             // check if neighbor node (the second member in the neighbor pair is node) is in the open and closed list
             bool is_in_open = (std::find(open.begin(), open.end(), neighbor.second) != open.end());
             bool is_in_closed = (std::find(closed.begin(), closed.end(), neighbor.second) != closed.end());
             // compute tentative g_value of neighbor (current cost + edge cost)
-            int g_value = costs[current] + neighbor.first->cost;
-            cout << "value : " << g_value << endl;
+            float g_value = costs[current] + neighbor.first->cost;
+            cout << "value : " << f(neighbor.second, *getNode(startNode), *getNode(endNode))  << endl;
             // The neighbor has to be skipped if in closed (already explored) and g_value doesn't need update
             if(is_in_closed && g_value >= costs[neighbor.second]) break;
             // update parent and cost of neighbor if never visited or better g_value than its cost
@@ -257,14 +239,12 @@ int main() {
     // create the grid of nodes
     createGrid();
 
-    // std::unordered_map<Edge*, Node*> nei = getNeighbors(getNode(sf::Vector2i(10, 10)));
-
 
     sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "A*");
 
     // A* algorithm
     sf::Vector2i START = sf::Vector2i(0, 0);
-    sf::Vector2i END = sf::Vector2i(0, 8);
+    sf::Vector2i END = sf::Vector2i(0, 46);
 
     vector<Node*> path = Astar(START, END);
     cout << "Size of path : " << path.size() << endl;
