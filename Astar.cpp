@@ -141,10 +141,10 @@ float f(Node* n, std::unordered_map<Node*, float> costs, Node target) {
 // this gets the candidate to visit in the open list (lowest f(n)=g(n)+h(n)
 Node* getCurrent(vector<Node*> open, std::unordered_map<Node*, float> costs, Node target) {
     auto current = std::min_element(open.begin(), 
-                            open.end(), 
-                            [costs, target](Node* candidate1, Node* candidate2) { 
-                                return f(candidate1, costs, target) < f(candidate2, costs, target);
-                            });
+                                    open.end(), 
+                                    [costs, target](Node* candidate1, Node* candidate2) { 
+                                        return f(candidate1, costs, target) < f(candidate2, costs, target);
+                                    });
     return *current;
 }
 
@@ -236,7 +236,7 @@ int main() {
 
     // A* algorithm
     sf::Vector2i START = sf::Vector2i(0, 0);
-    sf::Vector2i END = sf::Vector2i(10, 14);
+    sf::Vector2i END = sf::Vector2i(15, 15);
 
     // A* (chrono to mesure time complexity)
     auto start = std::chrono::high_resolution_clock::now();
