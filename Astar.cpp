@@ -1,19 +1,14 @@
-#include <SFML/Graphics/CircleShape.hpp>
-#include <SFML/System/Vector2.hpp>
-#include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <chrono>
 #include <SFML/Graphics.hpp>
 #include <eigen3/Eigen/Dense>
-#include <limits>
-#include <unordered_map>
-#include <variant>
-#include <vector>
+#include <iterator>
 
 using namespace std;
 
-const int WIDTH = 480;
-const int HEIGHT = 220;
+const int WIDTH = 200;
+const int HEIGHT = 200;
 
 struct Edge;
 struct Node;
@@ -131,22 +126,24 @@ float heuristic(Node current_node, Node target_node) {
 
 
 // Return total cost of path through node n ( f(n)=g(n)+h(n)
-float f(Node* n, Node former, Node target) {
-    auto edge_to_n = std::find_if(former.edges.begin(),
-                              former.edges.end(),
+float f(Node* n, std::unordered_map<Node*, float> costs, Node target) {
+    /*
+    auto edge_to_n = std::find_if(parent.edges.begin(),
+                              parent.edges.end(),
                               [&n](Edge& edge) { return *edge.nodes.second == *n; }); 
-    float g = edge_to_n->cost;
+    */
+    float g = costs[n];
     float h = heuristic(*n, target);
     return g + h;
 }
 
 
 // this gets the candidate to visit in the open list (lowest f(n)=g(n)+h(n)
-Node* getCurrent(vector<Node*> open, Node former, Node target) {
+Node* getCurrent(vector<Node*> open, std::unordered_map<Node*, float> costs, Node target) {
     auto current = std::min_element(open.begin(), 
                             open.end(), 
-                            [former, target](Node* candidate1, Node* candidate2) { 
-                                return f(candidate1, former, target) < f(candidate2, former, target);
+                            [costs, target](Node* candidate1, Node* candidate2) { 
+                                return f(candidate1, costs, target) < f(candidate2, costs, target);
                             });
     return *current;
 }
@@ -186,17 +183,16 @@ vector<Node*> Astar(sf::Vector2i startNode, sf::Vector2i endNode) {
     std::unordered_map<Node*, Node*> parentDict;
     std::unordered_map<Node*, float> costs = initCost(getNode(startNode));
     // set start node as current to explore and get its neighbors
-    cout << "start" << endl;
     Node* current = getNode(startNode);
-    cout << "push start in open" << endl;
     open.push_back(current);
     // until open is empty 
     while(open.size() != 0) {
         cout << endl << endl;
         // current to visit is lowest f(n) among open list
-        cout << "get new current node in list of size: " << open.size() << endl;
-        current = getCurrent(open, *getNode(startNode), *getNode(endNode));
+        current = getCurrent(open, costs, *getNode(endNode));
+        cout << "open size : " << open.size() << " ; closed size : " << closed.size() << endl;
         cout << "current is : " << current->x << " " << current->y << endl;
+        cout << costs[current] << " + " << heuristic(*current, *getNode(endNode)) << " = " << f(current, costs, *getNode(endNode)) << endl;
         if (current == getNode(endNode)) {
             cout << "Retrieving path" << endl;
             // END ALGORITHM AND RETRACE PATH
@@ -204,19 +200,15 @@ vector<Node*> Astar(sf::Vector2i startNode, sf::Vector2i endNode) {
         }
         // get the neighborings nodes and edges of current
         std::unordered_map<Edge*, Node*> neighbors = getNeighbors(current);
-        cout << "NEIGHBORS" << endl;
         // current has been visited so we put it out of open and place it in closed
         closed.push_back(current);
         open.erase(std::remove(open.begin(), open.end(), current));
         for (const auto& neighbor : neighbors) {
-            cout << "neighbor is : " << neighbor.second->x << " " << neighbor.second->y << endl;
-            cout << "cost : " << neighbor.first->cost << endl;
             // check if neighbor node (the second member in the neighbor pair is node) is in the open and closed list
             bool is_in_open = (std::find(open.begin(), open.end(), neighbor.second) != open.end());
             bool is_in_closed = (std::find(closed.begin(), closed.end(), neighbor.second) != closed.end());
             // compute tentative g_value of neighbor (current cost + edge cost)
             float g_value = costs[current] + neighbor.first->cost;
-            cout << "value : " << f(neighbor.second, *getNode(startNode), *getNode(endNode))  << endl;
             // The neighbor has to be skipped if in closed (already explored) and g_value doesn't need update
             if(is_in_closed && g_value >= costs[neighbor.second]) break;
             // update parent and cost of neighbor if never visited or better g_value than its cost
@@ -244,9 +236,14 @@ int main() {
 
     // A* algorithm
     sf::Vector2i START = sf::Vector2i(0, 0);
-    sf::Vector2i END = sf::Vector2i(0, 46);
+    sf::Vector2i END = sf::Vector2i(10, 14);
 
+    // A* (chrono to mesure time complexity)
+    auto start = std::chrono::high_resolution_clock::now();
     vector<Node*> path = Astar(START, END);
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    cout << "Time taken by A*: " << duration.count() << " microseconds" << std::endl;
     cout << "Size of path : " << path.size() << endl;
     
     cout << "Drawing..." << endl;
