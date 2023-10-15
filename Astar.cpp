@@ -193,6 +193,7 @@ vector<Node*> Astar(sf::Vector2i startNode, sf::Vector2i endNode) {
     std::unordered_map<Node*, Node*> parentDict;
     std::unordered_map<Node*, float> costs = initCost(getNode(startNode));
     std::priority_queue<Node*, std::vector<Node*>, NodeComparator> open(NodeComparator(&costs, *getNode(endNode)));
+    // to test if a node is in open or close
     vector<Node*> open_list;
     vector<Node*> closed;
     // set start node as current to explore and get its neighbors
