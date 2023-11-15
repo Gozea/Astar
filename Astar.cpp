@@ -39,9 +39,9 @@ void createGrid() {
 	//add edges to nodes
 	for (int i = 0 ; i < HEIGHT ; i++) {
 		for (int j = 0 ; j < WIDTH ; j++) {
-            // set node coordinates
-            nodes[j + i*WIDTH].x = j;
-            nodes[j + i*WIDTH].y = i;
+		        // set node coordinates
+		        nodes[j + i*WIDTH].x = j;
+		        nodes[j + i*WIDTH].y = i;
 			//exploring neighborhood
 			for (int m = -1 ; m <= 1 ; m++) {
 				for (int n = -1 ; n <= 1 ; n++) {
